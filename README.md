@@ -1,5 +1,5 @@
-# YF_Forecast
-Statistical forecasting models for Yellow Fever occurrence and incidence in Brazil
+# Yellow Fever Forecasting
+Statistical forecasting models for Yellow Fever occurrence and incidence in Brazil.
 
 
 Files included:
