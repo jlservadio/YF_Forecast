@@ -2,23 +2,41 @@
 
 rm(list = ls())
 
-setwd('YF/Forecast')
+setwd('~/work/YF/Forecast/Paper2')
+
+date()
 
 source('Code/MakeLag.R')
 source('Code/makeROC.R')
 
-dat = read.csv('YFForec_Data.csv')
+load('Data/complete_yf_dat_anyyf_gh.Rdata')
 
 library(parallel)
 library(tictoc)
 
+date()
+
+complete.yf.dat = complete.yf.dat.anyyf
+
+complete.yf.dat = complete.yf.dat[order(complete.yf.dat$GID_2, complete.yf.dat$Week), ]
+dat = complete.yf.dat
+
+dat$Cases = dat$Cases2; dat$Cases2 = NULL
+dat$Inc = dat$Inc2; dat$Inc2 = NULL
+
+date()
+
+dat$Month = round(dat$Month)
+dat$Year = round(dat$Year)
+
 dat$WWF_MHTNUM[which(!(dat$WWF_MHTNUM %in% c(1, 7)))] = 10
 dat$WWF_MHTNUM = as.factor(dat$WWF_MHTNUM)
 
+table(dat$WWF_MHTNUM)
 
 dat$Cases.bin = 1 * (dat$Cases > 0)
 
-num.cores = 20
+num.cores = 48
 
 
 #
@@ -41,6 +59,8 @@ test$Month[which(test$Month %in% c(6:11))] = 6; test$Month = as.factor(test$Mont
 #
 # Maximum: Lag 2
 # 
+
+date()
 
 lag.per = 2
 
@@ -75,14 +95,14 @@ test2 = test2[!is.na(test2$Keep), ]
 
 
 train2 = train2[ , c('Cases.bin', 'Inc', 'Tmp.L', 'Tmp.L2', 'Rain.L', 'Rain.L2', 'Hum.L', 'Hum.L2', 
-	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m'), ]
+	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m', 'VaxPop')]
 test2 = test2[ , c('Cases.bin', 'Inc', 'Tmp.L', 'Tmp.L2', 'Rain.L', 'Rain.L2', 'Hum.L', 'Hum.L2', 
-	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m'), ]
+	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m', 'VaxPop')]
 
 vars.to.include = c(3:ncol(train2))
-covars = matrix(NA, nrow = (2^length(vars.to.include))-1, ncol = length(vars.to.include))
+covars = matrix(NA, nrow = (2^length(vars.to.include)), ncol = length(vars.to.include))
 for (i in 1:nrow(covars)) {
-	covars[i, ] = as.numeric(intToBits(i))[1:ncol(covars)]
+	covars[i, ] = as.numeric(intToBits(i-1))[1:ncol(covars)]
 }
 for (i in 1:ncol(covars)) {
 	covars[ , i] = covars[ , i] * vars.to.include[i]
@@ -109,12 +129,17 @@ while(length(keep.examp) < 160) {
 
 length(keep.examp)
 
+cat('covars = ', dim(covars), '\t train = ', dim(train2), '\t test = ', dim(test2), '\n')
 
 tic()
 all.res = list()
+# for (i in keep.examp) { # for (i in 1:nrow(covars)) {
 
 all.res = mclapply(c(1:nrow(covars)), function(x) {
+#all.res = mclapply(c(1:200), function(x) {
 	
+	# i = keep.examp[x]
+
 	cur.res = list()
 	cur.res[[1]] = covars[x, ]
 	
@@ -141,7 +166,7 @@ toc()
 
 all.res.lag2 = all.res
 
-
+date()
 
 
 
@@ -185,14 +210,14 @@ test2 = test2[!is.na(test2$Keep), ]
 
 
 train2 = train2[ , c('Cases.bin', 'Inc', 'Tmp.L', 'Tmp.L2', 'Rain.L', 'Rain.L2', 'Hum.L', 'Hum.L2', 
-	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m'), ]
+	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m', 'VaxPop')]
 test2 = test2[ , c('Cases.bin', 'Inc', 'Tmp.L', 'Tmp.L2', 'Rain.L', 'Rain.L2', 'Hum.L', 'Hum.L2', 
-	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m'), ]
+	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m', 'VaxPop')]
 
 vars.to.include = c(3:ncol(train2))
-covars = matrix(NA, nrow = (2^length(vars.to.include))-1, ncol = length(vars.to.include))
+covars = matrix(NA, nrow = (2^length(vars.to.include)), ncol = length(vars.to.include))
 for (i in 1:nrow(covars)) {
-	covars[i, ] = as.numeric(intToBits(i))[1:ncol(covars)]
+	covars[i, ] = as.numeric(intToBits(i-1))[1:ncol(covars)]
 }
 for (i in 1:ncol(covars)) {
 	covars[ , i] = covars[ , i] * vars.to.include[i]
@@ -204,11 +229,15 @@ covars = covars[-which(covars[ , 4] > 0 & covars[ , 3] == 0), ]
 covars = covars[-which(covars[ , 6] > 0 & covars[ , 5] == 0), ]
 covars = covars[-which(covars[ , 8] > 0 & covars[ , 9] > 0), ]
 
+cat('covars = ', dim(covars), '\t train = ', dim(train2), '\t test = ', dim(test2), '\n')
 
 tic()
 all.res = list()
+# for (i in keep.examp) { # for (i in 1:nrow(covars)) {
 
 all.res = mclapply(c(1:nrow(covars)), function(x) {
+
+	# i = keep.examp[x]
 		
 	cur.res = list()
 	cur.res[[1]] = covars[x, ]
@@ -239,7 +268,7 @@ all.res.lag3 = all.res
 
 
 
-
+date()
 
 #
 # Maximum: Lag 4
@@ -279,14 +308,14 @@ test2 = test2[!is.na(test2$Keep), ]
 
 
 train2 = train2[ , c('Cases.bin', 'Inc', 'Tmp.L', 'Tmp.L2', 'Rain.L', 'Rain.L2', 'Hum.L', 'Hum.L2', 
-	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m'), ]
+	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m', 'VaxPop')]
 test2 = test2[ , c('Cases.bin', 'Inc', 'Tmp.L', 'Tmp.L2', 'Rain.L', 'Rain.L2', 'Hum.L', 'Hum.L2', 
-	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m'), ]
+	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m', 'VaxPop')]
 
 vars.to.include = c(3:ncol(train2))
-covars = matrix(NA, nrow = (2^length(vars.to.include))-1, ncol = length(vars.to.include))
+covars = matrix(NA, nrow = (2^length(vars.to.include)), ncol = length(vars.to.include))
 for (i in 1:nrow(covars)) {
-	covars[i, ] = as.numeric(intToBits(i))[1:ncol(covars)]
+	covars[i, ] = as.numeric(intToBits(i-1))[1:ncol(covars)]
 }
 for (i in 1:ncol(covars)) {
 	covars[ , i] = covars[ , i] * vars.to.include[i]
@@ -298,12 +327,16 @@ covars = covars[-which(covars[ , 4] > 0 & covars[ , 3] == 0), ]
 covars = covars[-which(covars[ , 6] > 0 & covars[ , 5] == 0), ]
 covars = covars[-which(covars[ , 8] > 0 & covars[ , 9] > 0), ]
 
+cat('covars = ', dim(covars), '\t train = ', dim(train2), '\t test = ', dim(test2), '\n')
 
 tic()
 all.res = list()
+# for (i in keep.examp) { # for (i in 1:nrow(covars)) {
 
 all.res = mclapply(c(1:nrow(covars)), function(x) {		
 	
+	# i = keep.examp[x]
+
 	cur.res = list()
 	cur.res[[1]] = covars[x, ]
 	
@@ -373,14 +406,14 @@ test2 = test2[!is.na(test2$Keep), ]
 
 
 train2 = train2[ , c('Cases.bin', 'Inc', 'Tmp.L', 'Tmp.L2', 'Rain.L', 'Rain.L2', 'Hum.L', 'Hum.L2', 
-	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m'), ]
+	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m', 'VaxPop')]
 test2 = test2[ , c('Cases.bin', 'Inc', 'Tmp.L', 'Tmp.L2', 'Rain.L', 'Rain.L2', 'Hum.L', 'Hum.L2', 
-	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m'), ]
+	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m', 'VaxPop')]
 
 vars.to.include = c(3:ncol(train2))
-covars = matrix(NA, nrow = (2^length(vars.to.include))-1, ncol = length(vars.to.include))
+covars = matrix(NA, nrow = (2^length(vars.to.include)), ncol = length(vars.to.include))
 for (i in 1:nrow(covars)) {
-	covars[i, ] = as.numeric(intToBits(i))[1:ncol(covars)]
+	covars[i, ] = as.numeric(intToBits(i-1))[1:ncol(covars)]
 }
 for (i in 1:ncol(covars)) {
 	covars[ , i] = covars[ , i] * vars.to.include[i]
@@ -392,11 +425,15 @@ covars = covars[-which(covars[ , 4] > 0 & covars[ , 3] == 0), ]
 covars = covars[-which(covars[ , 6] > 0 & covars[ , 5] == 0), ]
 covars = covars[-which(covars[ , 8] > 0 & covars[ , 9] > 0), ]
 
+cat('covars = ', dim(covars), '\t train = ', dim(train2), '\t test = ', dim(test2), '\n')
 
 tic()
 all.res = list()
+# for (i in keep.examp) { # for (i in 1:nrow(covars)) {
 
 all.res = mclapply(c(1:nrow(covars)), function(x) {
+
+	# i = keep.examp[x]
 		
 	cur.res = list()
 	cur.res[[1]] = covars[x, ]
@@ -467,14 +504,14 @@ test2 = test2[!is.na(test2$Keep), ]
 
 
 train2 = train2[ , c('Cases.bin', 'Inc', 'Tmp.L', 'Tmp.L2', 'Rain.L', 'Rain.L2', 'Hum.L', 'Hum.L2', 
-	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m'), ]
+	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m', 'VaxPop')]
 test2 = test2[ , c('Cases.bin', 'Inc', 'Tmp.L', 'Tmp.L2', 'Rain.L', 'Rain.L2', 'Hum.L', 'Hum.L2', 
-	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m'), ]
+	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m', 'VaxPop')]
 
 vars.to.include = c(3:ncol(train2))
-covars = matrix(NA, nrow = (2^length(vars.to.include))-1, ncol = length(vars.to.include))
+covars = matrix(NA, nrow = (2^length(vars.to.include)), ncol = length(vars.to.include))
 for (i in 1:nrow(covars)) {
-	covars[i, ] = as.numeric(intToBits(i))[1:ncol(covars)]
+	covars[i, ] = as.numeric(intToBits(i-1))[1:ncol(covars)]
 }
 for (i in 1:ncol(covars)) {
 	covars[ , i] = covars[ , i] * vars.to.include[i]
@@ -486,11 +523,15 @@ covars = covars[-which(covars[ , 4] > 0 & covars[ , 3] == 0), ]
 covars = covars[-which(covars[ , 6] > 0 & covars[ , 5] == 0), ]
 covars = covars[-which(covars[ , 8] > 0 & covars[ , 9] > 0), ]
 
+cat('covars = ', dim(covars), '\t train = ', dim(train2), '\t test = ', dim(test2), '\n')
 
 tic()
 all.res = list()
+# for (i in keep.examp) { # for (i in 1:nrow(covars)) {
 
 all.res = mclapply(c(1:nrow(covars)), function(x) {
+
+	# i = keep.examp[x]
 		
 	cur.res = list()
 	cur.res[[1]] = covars[x, ]
@@ -562,14 +603,14 @@ test2 = test2[!is.na(test2$Keep), ]
 
 
 train2 = train2[ , c('Cases.bin', 'Inc', 'Tmp.L', 'Tmp.L2', 'Rain.L', 'Rain.L2', 'Hum.L', 'Hum.L2', 
-	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m'), ]
+	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m', 'VaxPop')]
 test2 = test2[ , c('Cases.bin', 'Inc', 'Tmp.L', 'Tmp.L2', 'Rain.L', 'Rain.L2', 'Hum.L', 'Hum.L2', 
-	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m'), ]
+	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m', 'VaxPop')]
 
 vars.to.include = c(3:ncol(train2))
-covars = matrix(NA, nrow = (2^length(vars.to.include))-1, ncol = length(vars.to.include))
+covars = matrix(NA, nrow = (2^length(vars.to.include)), ncol = length(vars.to.include))
 for (i in 1:nrow(covars)) {
-	covars[i, ] = as.numeric(intToBits(i))[1:ncol(covars)]
+	covars[i, ] = as.numeric(intToBits(i-1))[1:ncol(covars)]
 }
 for (i in 1:ncol(covars)) {
 	covars[ , i] = covars[ , i] * vars.to.include[i]
@@ -581,11 +622,15 @@ covars = covars[-which(covars[ , 4] > 0 & covars[ , 3] == 0), ]
 covars = covars[-which(covars[ , 6] > 0 & covars[ , 5] == 0), ]
 covars = covars[-which(covars[ , 8] > 0 & covars[ , 9] > 0), ]
 
+cat('covars = ', dim(covars), '\t train = ', dim(train2), '\t test = ', dim(test2), '\n')
 
 tic()
 all.res = list()
+# for (i in keep.examp) { # for (i in 1:nrow(covars)) {
 
 all.res = mclapply(c(1:nrow(covars)), function(x) {
+
+	# i = keep.examp[x]
 	
 	cur.res = list()
 	cur.res[[1]] = covars[x, ]
@@ -656,14 +701,14 @@ test2 = test2[!is.na(test2$Keep), ]
 
 
 train2 = train2[ , c('Cases.bin', 'Inc', 'Tmp.L', 'Tmp.L2', 'Rain.L', 'Rain.L2', 'Hum.L', 'Hum.L2', 
-	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m'), ]
+	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m', 'VaxPop')]
 test2 = test2[ , c('Cases.bin', 'Inc', 'Tmp.L', 'Tmp.L2', 'Rain.L', 'Rain.L2', 'Hum.L', 'Hum.L2', 
-	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m'), ]
+	'Month', 'Cases.bin.L', 'Incidence.L', 'MEAN.DrDens', 'WWF_MHTNUM', 'NDVI', 'Elevation_m', 'VaxPop')]
 
 vars.to.include = c(3:ncol(train2))
-covars = matrix(NA, nrow = (2^length(vars.to.include))-1, ncol = length(vars.to.include))
+covars = matrix(NA, nrow = (2^length(vars.to.include)), ncol = length(vars.to.include))
 for (i in 1:nrow(covars)) {
-	covars[i, ] = as.numeric(intToBits(i))[1:ncol(covars)]
+	covars[i, ] = as.numeric(intToBits(i-1))[1:ncol(covars)]
 }
 for (i in 1:ncol(covars)) {
 	covars[ , i] = covars[ , i] * vars.to.include[i]
@@ -675,11 +720,15 @@ covars = covars[-which(covars[ , 4] > 0 & covars[ , 3] == 0), ]
 covars = covars[-which(covars[ , 6] > 0 & covars[ , 5] == 0), ]
 covars = covars[-which(covars[ , 8] > 0 & covars[ , 9] > 0), ]
 
+cat('covars = ', dim(covars), '\t train = ', dim(train2), '\t test = ', dim(test2), '\n')
 
 tic()
 all.res = list()
+# for (i in keep.examp) { # for (i in 1:nrow(covars)) {
 
 all.res = mclapply(c(1:nrow(covars)), function(x) {
+
+	# i = keep.examp[x]
 	
 	cur.res = list()
 	cur.res[[1]] = covars[x, ]
@@ -737,6 +786,6 @@ for (i in 1:nrow(aucs)) {
 }
 
 
-rbind(apply(aucs, 2, max), apply(saes, 2, min))
+rbind(apply(aucs, 2, max), apply(saes, 2, min), apply(saes, 2, min)/sum(test2$Inc > 0))
 
 
